@@ -1,0 +1,1822 @@
+---
+title: "STA9750 HW2"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(plotly)
+library(dplyr)
+library(tidyr)
+library(gridExtra)
+library(ggplot2)
+library(gtools)
+
+```
+
+
+
+
+```{r echo=FALSE}
+
+columns = c('x','start_date','end_date', 'manly_feel','manly_perceived',
+            'ideas_father','ideas_mother','ideas_other_family',
+           'ideas_pop_culture','ideas_friends','ideas_other','society_pressure_yes_no',
+           'friend_professional_advice','friend_personal_advice','male_affection',
+           'cry','physical_fight','sex_women','sex_men','watch_sports','workout',
+           'therapy',
+           'feel_lonely', 'worry_height','worry_weight','worry_hair','worry_physique',
+           'worry_genitalia_appearance','worry_clothing','worry_sex',
+           'worry_health_mental',
+           'worry_health_physical','worry_finances','worry_providing','worry_other',
+           'employment_status','work_advantage_money','work_advantage_influence',
+           'work_advantage_choices','work_advantage_opportunities',
+           'work_advantage_praise','work_advantage_support','work_advantage_other',
+           'work_advantage_none', 'work_disadvantage_female_hiring',
+           'work_disadvantage_risk_harassment','work_disadvantage_risk_sexism_racism',
+           'work_disadvantage_other','work_disadvantage_none', 
+           'harassment_incident_confronted',
+           'harassment_incident_hr','harassment_incident_manager',
+           'harassment_incident_victim',
+           'harassment_incident_no_response','harassment_incident_never_witnessed',
+           'harassment_incident_other', 'no_response_harassment_reason', 
+           'me_too_awareness',
+           'me_too_workplace_behavior_change', 'first_move_relationships', 
+           'date_paying_frequency',
+           'date_paying_reason_moral','date_paying_reason_higher_earnings',
+           'date_paying_reason_rewarding','date_paying_reason_expectation',
+           'date_paying_reason_initiated_contact',
+           'date_paying_reason_reciprocity_test',
+           'date_paying_reason_other', 'intimacy_interest_body_language',
+           'intimacy_interest_ask_consent','intimacy_interest_physical_move',
+           'intimacy_interest_situation_dependent','intimacy_interest_not_clear',
+           'intimacy_interest_other', 'sexual_boundaries_recalled_past_encounter',
+           'sexual_boundaries_consulted_friends',
+           'sexual_boundaries_contacted_past_partner',
+           'sexual_boundaries_none', 'me_too_romantic_behavioral_change', 
+           'relationship_status',
+           'children_under_18','children_over_18','children_none','sexual_orientation',
+           'race','education','state','income','region','device','race2',
+           'racethn4','educ3','educ4','age3','kids','orientation','weight')
+
+men = read.csv('https://raw.githubusercontent.com/fivethirtyeight/data/master/masculinity-survey/raw-responses.csv',header = TRUE)
+
+
+colnames(men) = columns
+
+
+```
+
+# What does it mean to be a man?
+## Q1
+
+
+```{r echo=TRUE}
+
+data = men %>% select(society_pressure_yes_no, orientation) %>%
+  mutate(orientation = as.character(orientation)) %>% mutate(orientation = ifelse(
+    orientation ==
+      'Other',
+    'Gay_Bisexual',
+    ifelse(orientation == 'Gay/Bisexual', 'Gay_Bisexual', orientation)
+  )) %>%
+  group_by(orientation) %>%
+  count(society_pressure_yes_no) %>%
+  filter(orientation != 'No answer') %>%
+  full_join(
+    men %>%
+      select(society_pressure_yes_no) %>%
+      count(society_pressure_yes_no) %>%
+      mutate('orientation' = 'All_Men'),
+    by = c('orientation', 'society_pressure_yes_no', 'n')
+  ) %>% spread(orientation, n) %>% mutate(
+    'All_Pct' = 100*All_Men / sum(All_Men),
+    'Gay_Pct' = 100*Gay_Bisexual / sum(Gay_Bisexual),
+    'Straight_Pct' = 100*Straight / sum(Straight)
+  ) %>%
+  select(-c(2, 3, 4)) %>% gather(key, value, 'All_Pct', 'Gay_Pct', 'Straight_Pct') %>% 
+  spread(society_pressure_yes_no, value) %>% mutate(key = ifelse(
+    key == 'All_Pct',
+    'All Adult Men',
+    ifelse(
+      key == 'Gay_Pct',
+      'Gay/Bisexual/Other Men',
+      ifelse(key == 'Straight_Pct', 'Straight Men', key)
+    )
+  )) %>% rename(
+    'pressure_no' = 'No',
+    'pressure_no_answer' = 'No answer',
+    'pressure_yes' = 'Yes',
+    'y' = 'key'
+  )
+
+
+p = plot_ly(data,width=1100) %>% add_bars(
+  x = ~pressure_yes,
+  y = ~y,
+  width=0.2,
+  type = 'bar',
+  orientation = 'h',
+  name = 'Yes'
+) %>%
+  add_bars(
+    x = ~ pressure_no_answer,
+    y = ~y,
+    width = 0.2,
+    name = 'No Answer'
+  ) %>% 
+  add_bars(
+    x = ~ pressure_no,
+    y = ~y,
+    width=0.2,
+    name = 'No'
+  ) %>%
+  layout(
+    title = 'Do you think society puts pressure on men in a way 
+    that is unhealthy or bad for them?',
+    barmode = 'stack',
+    paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+    plot_bgcolor = 'rgba(255, 255, 255, 0.73)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = ""))
+
+p
+
+
+
+```
+
+```{r echo = TRUE}
+
+data = men %>% select('worry_height','worry_weight','worry_hair','worry_physique',
+           'worry_genitalia_appearance','worry_clothing','worry_sex',
+           'worry_health_mental',
+           'worry_health_physical','worry_finances','worry_providing','worry_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/1615)
+
+p1 = data %>% plot_ly(width = 1200, height = 800, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(57, 219, 181, 0.5)',
+      line = list(color = 'rgba(57, 219, 181, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    title = 'What do you worry about on a daily or near-daily basis? (All Adult Men)',
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = ""),
+    margin = list(l=450))
+  
+```
+
+```{r echo = TRUE}
+
+gay_count = men %>% filter(orientation == 'Gay/Bisexual' | 
+                        orientation == 'Other') %>% count()
+
+data = men %>% filter(orientation == 'Gay/Bisexual' | 
+                        orientation == 'Other') %>% select('worry_height','worry_weight','worry_hair','worry_physique',
+           'worry_genitalia_appearance','worry_clothing','worry_sex',
+           'worry_health_mental',
+           'worry_health_physical','worry_finances','worry_providing','worry_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(gay_count))
+
+p2 = data %>% plot_ly(width = 1200, height = 800, name = 'Gay/Bisexual/Other Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(0, 42, 230, 0.5)',
+      line = list(color = 'rgba(0, 42, 230, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    title = 'What do you worry about on a daily or near-daily basis? (Gay/Bisexual/Other Men)',
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = ""),
+    margin = list(l=450))
+
+
+```
+
+
+```{r echo = TRUE}
+
+straight_count = men %>% filter(orientation == 'Straight') %>% count()
+
+data = men %>% filter(orientation == 'Straight') %>% select('worry_height','worry_weight','worry_hair','worry_physique',
+           'worry_genitalia_appearance','worry_clothing','worry_sex',
+           'worry_health_mental',
+           'worry_health_physical','worry_finances','worry_providing','worry_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(straight_count))
+
+p3 = data %>% plot_ly(width = 1200, height = 800, name = 'Straight Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(194, 0, 0, 0.5)',
+      line = list(color = 'rgba(194, 0, 0, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    title = 'What do you worry about on a daily or near-daily basis? (Straight Men)',
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = ""),
+    margin = list(l=450))
+
+```
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3,nrows=3) %>% 
+  layout(title = 'What do you worry about on a daily or near-daily basis?',
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+```
+
+
+```{r echo = TRUE}
+
+##All Men
+
+data = men %>% select('work_advantage_money','work_advantage_influence',
+           'work_advantage_choices','work_advantage_opportunities',
+           'work_advantage_praise','work_advantage_support','work_advantage_other',
+           'work_advantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/1615)
+
+p1 = data %>% plot_ly(width = 1200, height = 800, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(14, 255, 10, 0.5)',
+      line = list(color = 'rgba(14, 255, 10, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+##Gay Men
+
+gay_count = men %>% filter(orientation == 'Gay/Bisexual' | 
+                        orientation == 'Other') %>% count()
+
+data = men %>% filter(orientation == 'Gay/Bisexual' | 
+                        orientation == 'Other') %>% select('work_advantage_money','work_advantage_influence',
+           'work_advantage_choices','work_advantage_opportunities',
+           'work_advantage_praise','work_advantage_support','work_advantage_other',
+           'work_advantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(gay_count))
+
+p2 = data %>% plot_ly(width = 1200, height = 800, name = 'Gay/Bisexual/Other Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(100, 10, 255, 0.5)',
+      line = list(color = 'rgba(100, 10, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+
+straight_count = men %>% filter(orientation == 'Straight') %>% count()
+
+data = men %>% filter(orientation == 'Straight') %>% select('work_advantage_money','work_advantage_influence',
+           'work_advantage_choices','work_advantage_opportunities',
+           'work_advantage_praise','work_advantage_support','work_advantage_other',
+           'work_advantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(straight_count))
+
+##Straight Men
+
+p3 = data %>% plot_ly(width = 1200, height = 800, name = 'Straight Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(10, 112, 255, 0.5)',
+      line = list(color = 'rgba(10, 112, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+```
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3, nrows=3) %>% 
+  layout(title = "How would you say it's an advantage to be a man at your work right now?",
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+
+```
+
+```{r echo = TRUE}
+
+
+##All Men
+
+data = men %>% select('work_disadvantage_female_hiring',
+           'work_disadvantage_risk_harassment','work_disadvantage_risk_sexism_racism',
+           'work_disadvantage_other','work_disadvantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/1615)
+
+p1 = data %>% plot_ly(width = 1200, height = 800, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(14, 255, 10, 0.5)',
+      line = list(color = 'rgba(14, 255, 10, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+##Gay Men
+
+gay_count = men %>% filter(orientation == 'Gay/Bisexual' | 
+                        orientation == 'Other') %>% count()
+
+data = men %>% filter(orientation == 'Gay/Bisexual' | 
+                        orientation == 'Other') %>% select('work_disadvantage_female_hiring',
+           'work_disadvantage_risk_harassment','work_disadvantage_risk_sexism_racism',
+           'work_disadvantage_other','work_disadvantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(gay_count))
+
+p2 = data %>% plot_ly(width = 1200, height = 800, name = 'Gay/Bisexual/Other Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(100, 10, 255, 0.5)',
+      line = list(color = 'rgba(100, 10, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+
+straight_count = men %>% filter(orientation == 'Straight') %>% count()
+
+data = men %>% filter(orientation == 'Straight') %>% select('work_disadvantage_female_hiring',
+           'work_disadvantage_risk_harassment','work_disadvantage_risk_sexism_racism',
+           'work_disadvantage_other','work_disadvantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(straight_count))
+
+##Straight Men
+
+p3 = data %>% plot_ly(width = 1200, height = 800, name = 'Straight Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(10, 112, 255, 0.5)',
+      line = list(color = 'rgba(10, 112, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+
+```
+
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3, nrows=3) %>% 
+  layout(title = "How would you say it's a disadvantage to be a man at your work right now?",
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+
+```
+
+```{r echo = TRUE}
+
+
+
+##All Men
+
+data = men %>% select('date_paying_frequency') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/1615)
+
+p1 = data %>% plot_ly(width = 1200, height = 800, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(14, 255, 10, 0.5)',
+      line = list(color = 'rgba(14, 255, 10, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=200))
+
+##Gay Men
+
+gay_count = men %>% filter(orientation == 'Gay/Bisexual' | 
+                        orientation == 'Other') %>% count()
+
+data = men %>% filter(orientation == 'Gay/Bisexual' | 
+                        orientation == 'Other') %>% select('date_paying_frequency') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(gay_count))
+
+p2 = data %>% plot_ly(width = 1200, height = 800, name = 'Gay/Bisexual/Other Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(100, 10, 255, 0.5)',
+      line = list(color = 'rgba(100, 10, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=200))
+
+
+straight_count = men %>% filter(orientation == 'Straight') %>% count()
+
+data = men %>% filter(orientation == 'Straight') %>% select('date_paying_frequency') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(straight_count))
+
+##Straight Men
+
+p3 = data %>% plot_ly(width = 1200, height = 800, name = 'Straight Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(10, 112, 255, 0.5)',
+      line = list(color = 'rgba(10, 112, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=200))
+
+```
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3, nrows=3) %>% 
+  layout(title = "How often do you try to be the one who pays when on a date?",
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+
+```
+
+```{r echo = TRUE}
+
+
+
+##All Men
+
+data = men %>% select('intimacy_interest_body_language',
+           'intimacy_interest_ask_consent','intimacy_interest_physical_move',
+           'intimacy_interest_situation_dependent','intimacy_interest_not_clear',
+           'intimacy_interest_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/1615)
+
+p1 = data %>% plot_ly(width = 1200, height = 900, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(14, 255, 10, 0.5)',
+      line = list(color = 'rgba(14, 255, 10, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+##Gay Men
+
+gay_count = men %>% filter(orientation == 'Gay/Bisexual' | 
+                        orientation == 'Other') %>% count()
+
+data = men %>% filter(orientation == 'Gay/Bisexual' | 
+                        orientation == 'Other') %>% select('intimacy_interest_body_language',
+           'intimacy_interest_ask_consent','intimacy_interest_physical_move',
+           'intimacy_interest_situation_dependent','intimacy_interest_not_clear',
+           'intimacy_interest_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(gay_count))
+
+p2 = data %>% plot_ly(width = 1200, height = 900, name = 'Gay/Bisexual/Other Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(100, 10, 255, 0.5)',
+      line = list(color = 'rgba(100, 10, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+
+straight_count = men %>% filter(orientation == 'Straight') %>% count()
+
+data = men %>% filter(orientation == 'Straight') %>% select('intimacy_interest_body_language',
+           'intimacy_interest_ask_consent','intimacy_interest_physical_move',
+           'intimacy_interest_situation_dependent','intimacy_interest_not_clear',
+           'intimacy_interest_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(straight_count))
+
+##Straight Men
+
+p3 = data %>% plot_ly(width = 1200, height = 900, name = 'Straight Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(10, 112, 255, 0.5)',
+      line = list(color = 'rgba(10, 112, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+```
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3, nrows=3) %>% 
+  layout(title = "When you want to be physically intimate with someone, how do you gauge their interest?",
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+
+```
+
+  It seems gay men feel there is greater unhealthy social pressure on them as opposed to their straight counterparts. Gay men also worry more about their physique and other physical attributes such as hair/hairline, height, weight, sexual performance, and appearance of genitalia as well as their mental health, and finances. The only thing straight men worry about more than gay men is their physical health and ability to provide for their family. 
+  
+  When it comes to work straight men are more so than gay men of the opinion that men make more money, have more professional opportunities, and have more choices, while gay men believe men are taken more seriously on a greater scale than straight men do as well as offered more praise. On the whole, straight men feel they are at a disadvantage in the workplace far more than gay men.
+  
+  In the romantic realm straight men seem to try to always be the one who pays for a date far more than do gay men who are on the whole much more likely to sometimes or often be the one who pays.
+  
+  As far as physical intimacy, gay men are more keen on verbal confirmation of consent while straight men are more likely to make a physical move to see how the other person reacts.
+  
+## Q2
+
+
+```{r echo=TRUE}
+
+data = men %>% select(society_pressure_yes_no, race) %>%
+  mutate(race = as.character(race)) %>% mutate(race = ifelse(race != 'White', 'Non_White', race)) %>%
+  group_by(race) %>%
+  count(society_pressure_yes_no) %>%
+  full_join(
+    men %>%
+      select(society_pressure_yes_no) %>%
+      count(society_pressure_yes_no) %>%
+      mutate('race' = 'All_Men'),
+    by = c('race', 'society_pressure_yes_no', 'n')
+  ) %>% spread(race, n) %>% mutate(
+    'All_Pct' = 100 * All_Men / sum(All_Men),
+    'White_Pct' = 100 * White / sum(White),
+    'Non_White_Pct' = 100 * Non_White / sum(Non_White)
+  ) %>%
+  select(-c(2, 3, 4)) %>% gather(key, value, 'All_Pct', 'White_Pct', 'Non_White_Pct') %>%
+  spread(society_pressure_yes_no, value) %>% mutate(key = ifelse(
+    key == 'All_Pct',
+    'All Adult Men',
+    ifelse(key == 'White_Pct',
+           'White Men', 'Non-White Men')
+  )) %>% rename(
+    'pressure_no' = 'No',
+    'pressure_no_answer' = 'No answer',
+    'pressure_yes' = 'Yes',
+    'y' = 'key'
+  )
+
+
+p = plot_ly(data,width=1100) %>% add_bars(
+  x = ~pressure_yes,
+  y = ~y,
+  width=0.2,
+  type = 'bar',
+  orientation = 'h',
+  name = 'Yes'
+) %>%
+  add_bars(
+    x = ~ pressure_no_answer,
+    y = ~y,
+    width = 0.2,
+    name = 'No Answer'
+  ) %>% 
+  add_bars(
+    x = ~ pressure_no,
+    y = ~y,
+    width=0.2,
+    name = 'No'
+  ) %>%
+  layout(
+    title = 'Do you think society puts pressure on men in a way 
+    that is unhealthy or bad for them?',
+    barmode = 'stack',
+    paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+    plot_bgcolor = 'rgba(255, 255, 255, 0.73)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = ""))
+
+p
+
+
+```
+
+```{r echo = TRUE}
+
+data = men %>% select('worry_height','worry_weight','worry_hair','worry_physique',
+           'worry_genitalia_appearance','worry_clothing','worry_sex',
+           'worry_health_mental',
+           'worry_health_physical','worry_finances','worry_providing','worry_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/1615)
+
+p1 = data %>% plot_ly(width = 1200, height = 800, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(57, 219, 181, 0.5)',
+      line = list(color = 'rgba(57, 219, 181, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = ""),
+    margin = list(l=450))
+  
+```
+
+```{r echo = TRUE}
+
+white_count = men %>% mutate(race = as.character(race)) %>% mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% filter(race == 'White') %>% count()
+
+data = men %>% mutate(race = as.character(race)) %>% 
+  mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'White') %>%
+  select('worry_height','worry_weight','worry_hair','worry_physique',
+           'worry_genitalia_appearance','worry_clothing','worry_sex',
+           'worry_health_mental', 'worry_health_physical',
+         'worry_finances','worry_providing','worry_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(white_count))
+
+p2 = data %>% plot_ly(width = 1200, height = 800, name = 'White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(0, 42, 230, 0.5)',
+      line = list(color = 'rgba(0, 42, 230, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = ""),
+    margin = list(l=450))
+
+
+```
+
+
+```{r echo = TRUE}
+
+nonwhite_count = men %>% mutate(race = as.character(race)) %>% mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% filter(race == 'Non_White') %>% count()
+
+data = men %>% mutate(race = as.character(race)) %>% mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% filter(race == 'Non_White') %>% select('worry_height','worry_weight','worry_hair','worry_physique',
+           'worry_genitalia_appearance','worry_clothing','worry_sex',
+           'worry_health_mental',
+           'worry_health_physical','worry_finances','worry_providing','worry_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(nonwhite_count))
+
+p3 = data %>% plot_ly(width = 1200, height = 800, name = 'Non-White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(194, 0, 0, 0.5)',
+      line = list(color = 'rgba(194, 0, 0, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = ""),
+    margin = list(l=450))
+
+```
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3,nrows=3) %>% 
+  layout(title = 'What do you worry about on a daily or near-daily basis?',
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+```
+
+
+```{r echo = TRUE}
+
+##All Men
+
+data = men %>% select('work_advantage_money','work_advantage_influence',
+           'work_advantage_choices','work_advantage_opportunities',
+           'work_advantage_praise','work_advantage_support','work_advantage_other',
+           'work_advantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/1615)
+
+p1 = data %>% plot_ly(width = 1200, height = 800, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(14, 255, 10, 0.5)',
+      line = list(color = 'rgba(14, 255, 10, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+## White Men
+
+data = men %>% mutate(race = as.character(race)) %>% 
+  mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'White') %>% 
+  select('work_advantage_money','work_advantage_influence',
+           'work_advantage_choices','work_advantage_opportunities',
+           'work_advantage_praise','work_advantage_support','work_advantage_other',
+           'work_advantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(white_count))
+
+p2 = data %>% plot_ly(width = 1200, height = 800, name = 'White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(100, 10, 255, 0.5)',
+      line = list(color = 'rgba(100, 10, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+## Non-White Men
+
+data = men %>% mutate(race = as.character(race)) %>% mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% filter(race == 'Non_White') %>% select('work_advantage_money','work_advantage_influence',
+           'work_advantage_choices','work_advantage_opportunities',
+           'work_advantage_praise','work_advantage_support','work_advantage_other',
+           'work_advantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(nonwhite_count))
+
+
+p3 = data %>% plot_ly(width = 1200, height = 800, name = 'Non-White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(10, 112, 255, 0.5)',
+      line = list(color = 'rgba(10, 112, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+```
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3, nrows=3) %>% 
+  layout(title = "How would you say it's an advantage to be a man at your work right now?",
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+
+```
+
+```{r echo = TRUE}
+
+
+##All Men
+
+data = men %>% select('work_disadvantage_female_hiring',
+           'work_disadvantage_risk_harassment','work_disadvantage_risk_sexism_racism',
+           'work_disadvantage_other','work_disadvantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/1615)
+
+p1 = data %>% plot_ly(width = 1200, height = 800, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(14, 255, 10, 0.5)',
+      line = list(color = 'rgba(14, 255, 10, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+## White Men
+
+data = men %>% mutate(race = as.character(race)) %>% 
+  mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'White') %>% select('work_disadvantage_female_hiring',
+           'work_disadvantage_risk_harassment','work_disadvantage_risk_sexism_racism',
+           'work_disadvantage_other','work_disadvantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(white_count))
+
+p2 = data %>% plot_ly(width = 1200, height = 800, name = 'White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(100, 10, 255, 0.5)',
+      line = list(color = 'rgba(100, 10, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+## Non-White Men
+
+data = men %>% mutate(race = as.character(race)) %>% mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% filter(race == 'Non_White') %>% select('work_disadvantage_female_hiring',
+           'work_disadvantage_risk_harassment','work_disadvantage_risk_sexism_racism',
+           'work_disadvantage_other','work_disadvantage_none') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(nonwhite_count))
+
+
+p3 = data %>% plot_ly(width = 1200, height = 800, name = 'Non-White Men') %>% 
+  add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(10, 112, 255, 0.5)',
+      line = list(color = 'rgba(10, 112, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+    plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+
+```
+
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3, nrows=3) %>% 
+  layout(title = "How would you say it's a disadvantage to be a man at your work right now?",
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+
+```
+
+```{r echo = TRUE}
+##All Men
+
+data = men %>% select('date_paying_frequency') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/1615)
+
+p1 = data %>% plot_ly(width = 1200, height = 800, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(14, 255, 10, 0.5)',
+      line = list(color = 'rgba(14, 255, 10, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=200))
+
+## White Men
+
+data = men %>% mutate(race = as.character(race)) %>% 
+  mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'White') %>% select('date_paying_frequency') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(white_count))
+
+p2 = data %>% plot_ly(width = 1200, height = 800, name = 'White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(100, 10, 255, 0.5)',
+      line = list(color = 'rgba(100, 10, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=200))
+
+## Non-White Men
+
+data = men %>% mutate(race = as.character(race)) %>% mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'Non_White') %>% 
+  select('date_paying_frequency') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(nonwhite_count))
+
+
+p3 = data %>% plot_ly(width = 1200, height = 800, name = 'Non-White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(10, 112, 255, 0.5)',
+      line = list(color = 'rgba(10, 112, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=200))
+
+```
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3, nrows=3) %>% 
+  layout(title = "How often do you try to be the one who pays when on a date?",
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+
+```
+
+```{r echo = TRUE}
+
+##All Men
+
+data = men %>% select('intimacy_interest_body_language',
+           'intimacy_interest_ask_consent','intimacy_interest_physical_move',
+           'intimacy_interest_situation_dependent','intimacy_interest_not_clear',
+           'intimacy_interest_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/1615)
+
+p1 = data %>% plot_ly(width = 1200, height = 900, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(14, 255, 10, 0.5)',
+      line = list(color = 'rgba(14, 255, 10, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+## White Men
+
+data = men %>% mutate(race = as.character(race)) %>% 
+  mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'White') %>% select('intimacy_interest_body_language',
+           'intimacy_interest_ask_consent','intimacy_interest_physical_move',
+           'intimacy_interest_situation_dependent','intimacy_interest_not_clear',
+           'intimacy_interest_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(white_count))
+
+p2 = data %>% plot_ly(width = 1200, height = 900, name = 'White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(100, 10, 255, 0.5)',
+      line = list(color = 'rgba(100, 10, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+## Non-White Men
+
+data = men %>% mutate(race = as.character(race)) %>% mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'Non_White') %>% select('intimacy_interest_body_language',
+           'intimacy_interest_ask_consent','intimacy_interest_physical_move',
+           'intimacy_interest_situation_dependent','intimacy_interest_not_clear',
+           'intimacy_interest_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(nonwhite_count))
+
+p3 = data %>% plot_ly(width = 1200, height = 900, name = 'Non-White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(10, 112, 255, 0.5)',
+      line = list(color = 'rgba(10, 112, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+```
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3, nrows=3) %>% 
+  layout(title = "When you want to be physically intimate with someone, how do you gauge their interest?",
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+
+```
+
+In breaking down our analysis by White versus Non-White we see similar trends emerging. Non-White men similar to Gay/Bisexual men feel that society puts unhealthy pressure on them more than White and Straight Men do.
+ 
+Non-White men worry more than White men about finances as well as most physical characteristics except their weight and physical health. 
+
+Non-White men more so than White men sense that men are taken more seriously at work, that men have more choices, and that men get more support from their managers.
+
+Both White and Non-White men alike feel that the disadvantage of being a man in the workplace is greater risk of being accused of sexual harassment.
+
+When it comes to dating Non-White men are less likely to always pay for the date. And in terms of physical intimacy, Non-White men are more keen than their White counterparts on asking for verbal consent but are also more likely to make a physical move to see how the other person reacts as a way to gauge interest.
+
+## Q3
+
+```{r echo = TRUE}
+
+##All Men
+always_often_all = men %>% filter(date_paying_frequency == 'Always' | date_paying_frequency == 'Often') %>% count()
+
+data = men %>% filter(date_paying_frequency == 'Always' | date_paying_frequency == 'Often') %>% select('date_paying_reason_moral','date_paying_reason_higher_earnings',
+           'date_paying_reason_rewarding','date_paying_reason_expectation',
+           'date_paying_reason_initiated_contact',
+           'date_paying_reason_reciprocity_test',
+           'date_paying_reason_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(always_often_all))
+
+p1 = data %>% plot_ly(width = 1200, height = 900, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(14, 255, 10, 0.5)',
+      line = list(color = 'rgba(14, 255, 10, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+## White Men
+
+always_often_white = men %>% mutate(race = as.character(race)) %>% 
+  mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'White') %>% filter(date_paying_frequency == 'Always' | date_paying_frequency == 'Often') %>% count()
+
+data = men %>% mutate(race = as.character(race)) %>% 
+  mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'White') %>% filter(date_paying_frequency == 'Always' | date_paying_frequency == 'Often') %>% select('date_paying_reason_moral','date_paying_reason_higher_earnings',
+           'date_paying_reason_rewarding','date_paying_reason_expectation',
+           'date_paying_reason_initiated_contact',
+           'date_paying_reason_reciprocity_test',
+           'date_paying_reason_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(always_often_white))
+
+p2 = data %>% plot_ly(width = 1200, height = 900, name = 'White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(100, 10, 255, 0.5)',
+      line = list(color = 'rgba(100, 10, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+## Non-White Men
+
+always_often_nonwhite = men %>% mutate(race = as.character(race)) %>% 
+  mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'Non_White') %>% filter(date_paying_frequency == 'Always' | date_paying_frequency == 'Often') %>% count()
+
+data = men %>% mutate(race = as.character(race)) %>% mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'Non_White') %>% 
+  filter(date_paying_frequency == 'Always' | date_paying_frequency == 'Often') %>% 
+  select('date_paying_reason_moral','date_paying_reason_higher_earnings',
+           'date_paying_reason_rewarding','date_paying_reason_expectation',
+           'date_paying_reason_initiated_contact',
+           'date_paying_reason_reciprocity_test',
+           'date_paying_reason_other') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(always_often_nonwhite))
+
+p3 = data %>% plot_ly(width = 1200, height = 900, name = 'Non-White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(10, 112, 255, 0.5)',
+      line = list(color = 'rgba(10, 112, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+```
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3, nrows=3) %>% 
+  layout(title = "Which of the following are reasons why you try to pay when on a date?",
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+
+```
+
+
+
+```{r echo = TRUE}
+
+##All Men
+
+data = men %>% select('me_too_workplace_behavior_change') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/1615)
+
+p1 = data %>% plot_ly(width = 1200, height = 900, name = 'All Adult Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(14, 255, 10, 0.5)',
+      line = list(color = 'rgba(14, 255, 10, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+## White Men
+
+data = men %>% mutate(race = as.character(race)) %>% 
+  mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'White') %>% select('me_too_workplace_behavior_change') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(white_count))
+
+p2 = data %>% plot_ly(width = 1200, height = 900, name = 'White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(100, 10, 255, 0.5)',
+      line = list(color = 'rgba(100, 10, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+## Non-White Men
+
+data = men %>% mutate(race = as.character(race)) %>% mutate(race = ifelse(race != 'White', 'Non_White', race)) %>% 
+  filter(race == 'Non_White') %>% select('me_too_workplace_behavior_change') %>%
+  gather(key,value) %>% count(value, name = 'count') %>% 
+  filter(value != 'Not selected') %>% 
+  mutate('pct' = 100*count/unlist(nonwhite_count))
+
+p3 = data %>% plot_ly(width = 1200, height = 900, name = 'Non-White Men') %>% add_bars(
+    x = ~pct,
+    y = ~value,
+    width = 0.4,
+    type = 'bar',
+    orientation = 'h',
+    marker = list(
+      color = 'rgba(10, 112, 255, 0.5)',
+      line = list(color = 'rgba(10, 112, 255, 0.5)',
+                  width = 2))
+  ) %>% 
+  layout(
+    paper_bgcolor = 'rgba(245, 246, 249, 1)',
+         plot_bgcolor = 'rgba(245, 246, 249, 1)',
+    xaxis = list(title = "",
+                 showline = FALSE),
+    yaxis = list(title = "", categoryorder = "category descending"),
+    margin = list(l=450))
+
+```
+
+```{r echo = FALSE}
+
+subplot(p1,p2,p3, nrows=3) %>% 
+  layout(title = "Do you think about your behavior at work differently in the wake of #MeToo?",
+         paper_bgcolor = 'rgba(255, 255, 255, 0.73)',
+         plot_bgcolor = 'rgba(255, 255, 255, 0.73)')
+
+```
+
+For one of the questions not mentioned in the article I decided to look at reasons men who said they pay Always or Often on a date engage in that behavior. It seems that there is consensus among All Men and White and Non-White men that 'it's the right thing to do'. Non-White men do seem to feel that there is a higher societal expectation on them to pay as often as they do. Non-White men also seem to pay as a test of whether the other person will offer to share the cost twice as often as White men do while White men are much more likely to pay because they make more money than their date.
+
+The other point of interest is whether or not men think differently about their behavior at work in the wake of #MeToo. It seems White men are less acutely aware of their behavior at work in the wake of #MeToo than their Non-White counterparts while a total of 16% of all men surveyed have thought differently about their workplace behavior in the wake of #MeToo.
+
+# Basketball League
+## Q1
+
+```{r echo = TRUE}
+
+rnorm_round = function(n=1, mean, sd){
+  return(round(rnorm(n, mean, sd),0))
+}
+
+names = c('Jersey Lions','Westchester Cats','Long Island Tigers',
+        'Staten Island Dogs','The Bronx Foxes','Queens Bears',
+        'Manhattan Ducks','Brooklyn Rats')
+jl = c(7,7,3,0.5,0,0,0,0)
+wc = c(6,8,3,0.25,0,0,0,0)
+lit = c(7,6,4,0.3,0,0,0,0)
+sid = c(8,6,3,0.25,0,0,0,0)
+tbf = c(9,6,3,0.2,0,0,0,0)
+qb = c(6,9,5,0.35,0,0,0,0)
+md = c(7,6,3,0.2,0,0,0,0)
+br = c(8,7,4,0.25,0,0,0,0)
+
+stats = data.frame(rbind(jl,wc,lit,sid,tbf,qb,md,br))
+colnames(stats) = c('A','D','H','R','wins','losses','p_spread','games_played')
+
+teams = list()
+for(i in c(1:length(names))){
+  teams[[names[i]]] = stats[i,]
+}
+
+# 
+# teams = data.frame(rbind(jl,wc,lit,sid,tbf,qb,md,br))
+# teams = cbind(names,teams)
+# colnames(teams) = c('Team','A','D','H','R')
+# teams$Team = as.character(teams$Team)
+```
+
+## Q2
+
+```{r echo = TRUE}
+
+### GAME OUTCOME FUNCTION
+
+game_outcome = function(n=1, home, away){
+    mu = (0.6*home[[1]][1]+0.4*home[[1]][2])-
+      (0.4*away[[1]][1]+
+         0.6*away[[1]][2])+home[[1]][3]
+    
+    sdev = (1/home[[1]][4])+(1/away[[1]][4])
+    
+    homename = names(home)
+    awayname = names(away)
+    winner = c()
+    loser = c()
+    p_spread = c()
+    
+    for(i in c(1:n)){
+      current_spread = 0
+      while(current_spread == 0){
+      current_spread = rnorm_round(1, unlist(mu), unlist(sdev))
+      }
+      if(current_spread > 0){
+        winner = rbind(winner,homename)
+        loser = rbind(loser,awayname)
+        p_spread = c(p_spread,current_spread)
+      } else if (current_spread < 0) {
+        winner = rbind(winner,awayname)
+        loser = rbind(loser,homename)
+        p_spread = c(p_spread,current_spread)
+      }
+    }
+      outcome_list = list()
+      outcome_list[['p_spread']] = p_spread
+      outcome_list[['winner']] = data.frame(winner)
+      outcome_list[['loser']] = data.frame(loser)
+      return(outcome_list)
+}
+
+```
+
+## Q3
+
+```{r echo = TRUE}
+half_season = permutations(length(names),2,names)
+full_season = rbind(half_season,half_season)
+
+### SEASON OUTCOME FUNCTION 
+
+season_outcome = function(n = 1, home, away, list) {
+  for (j in c(1:length(home))) {
+    homename = home[j]
+    awayname = away[j]
+    p_spread = c()
+    
+    mu = (0.6 * list[[homename]][1] + 0.4 * list[[homename]][2]) - (0.4 *
+                                                                      list[[awayname]][1] + 0.6 * list[[awayname]][2]) + list[[homename]][3]
+    sdev = (1 / list[[homename]][4]) + (1 / list[[awayname]][4])
+    
+    
+    for (i in c(1:n)) {
+      list[[homename]]$'games_played' = list[[homename]]$'games_played'+1
+      list[[awayname]]$'games_played' = list[[awayname]]$'games_played'+1
+      current_spread = 0
+      while (current_spread == 0) {
+        current_spread = rnorm_round(1, unlist(mu), unlist(sdev))
+      }
+      if (current_spread > 0) {
+        list[[homename]]$'wins' = list[[homename]]$'wins'+1
+        list[[awayname]]$'losses' = list[[awayname]]$'losses'+1
+        list[[homename]]$'p_spread' = list[[homename]]$'p_spread'+current_spread
+      } else if (current_spread < 0) {
+        list[[awayname]]$'wins' = list[[awayname]]$'wins'+1
+        list[[homename]]$'losses' = list[[homename]]$'losses'+1
+        list[[awayname]]$'p_spread' = list[[awayname]]$'p_spread'+current_spread
+      }
+    }
+    
+  }
+  
+  season_frame = data.frame()
+  for (name in names(list)) {
+    season_frame = rbind(season_frame, list[[name]])
+  }
+  
+  season_frame = season_frame %>% mutate('win_loss' = wins - losses)
+  season_frame = cbind(names, season_frame)
+  season_frame$names = as.character(names)
+  season_frame = season_frame[order(season_frame$win_loss,
+                     season_frame$p_spread,
+                     season_frame$names,
+                     decreasing = TRUE), ]
+  
+  return(season_frame)
+  
+}
+
+```
+
+### a.
+
+```{r echo = TRUE}
+
+season_rank = list()
+for(i in c(1:5)){
+season_frame = season_outcome(1, full_season[,1],full_season[,2], teams)
+  for(name in season_frame$names){
+    season_rank[[name]] = c(season_rank[[name]], which(season_frame$names == name))
+  }
+}
+
+
+league_sim = data.frame(season_rank)
+
+season_wins = list()
+for(name in colnames(league_sim)){
+    season_wins[[name]] = length(league_sim[league_sim[,name]==1,name])
+}
+
+season_wins = data.frame(season_wins)
+
+season_wins %>% gather(key,value) %>% arrange(desc(value)) %>% ggplot() + geom_col(aes(x=key,y=value, fill = key)) + xlab('Team') + ylab('Seasons Won')
+
+```
+
+### b.
+
+```{r echo}
+
+league_sim %>% summarise_all(funs(mean)) %>% gather(key,value) %>% ggplot() + geom_col(aes(x=key,y=value,fill=key)) + ylab('Mean Ranking') + xlab('Team')
+
+
+```
+
+## **INCOMPLETE** Q4 I coded myself into a corner on this question and am quite lost. Sad.
+
+```{r echo = TRUE}
+
+game_outcome(1, teams[1],teams[2])
+
+rankings = league_sim %>% summarise_all(funs(mean))
+
+bracket = sample(colnames(rankings),8)
+
+bracket_df = data.frame(bracket[1:2],bracket[3:4],bracket[5:6],bracket[7:8])
+colnames(bracket_df) = c('matchup1','matchup2','matchup3','matchup4')
+
+bracket_df$matchup1 = as.character(bracket_df$matchup1)
+bracket_df$matchup2 = as.character(bracket_df$matchup2)
+bracket_df$matchup3 = as.character(bracket_df$matchup3)
+bracket_df$matchup4 = as.character(bracket_df$matchup4)
+
+
+bracket_matchups = data.frame()
+
+for(i in c(1:length(colnames(bracket_df)))){
+  if(rankings[[bracket_df[1,i]]] > rankings[[bracket_df[2,i]]]){
+    bracket_matchups = rbind(bracket_matchups, rbind(c(bracket_df[1,i],bracket_df[2,i]),
+          c(bracket_df[2,i],bracket_df[1,i]),
+            c(bracket_df[1,i],bracket_df[2,i])))
+  } else {
+    bracket_matchups = rbind(bracket_matchups, rbind(c(bracket_df[2,i],bracket_df[1,i]),
+          c(bracket_df[1,i],bracket_df[2,i]),
+          c(bracket_df[2,i],bracket_df[1,i])))
+  }
+}
+
+
+bracket_matchups$V1 = as.character(bracket_matchups$V1)
+bracket_matchups$V2 = as.character(bracket_matchups$V2)
+
+
+### SEASON OUTCOME FUNCTION 
+
+season_outcome_bracket = function(n = 1, home, away, list) {
+  for (j in c(1:length(home))) {
+    homename = gsub('.',' ',home[j],fixed=TRUE)
+    awayname = gsub('.',' ',away[j],fixed=TRUE)
+    
+    print(homename)
+    print(awayname)
+    
+    p_spread = c()
+    
+    mu = (0.6 * list[[homename]][1] + 0.4 * list[[homename]][2]) - (0.4 *
+                                                                      list[[awayname]][1] + 0.6 * list[[awayname]][2]) + list[[homename]][3]
+    sdev = (1 / list[[homename]][4]) + (1 / list[[awayname]][4])
+    
+    
+    for (i in c(1:n)) {
+      list[[homename]]$'games_played' = list[[homename]]$'games_played'+1
+      list[[awayname]]$'games_played' = list[[awayname]]$'games_played'+1
+      current_spread = 0
+      while (current_spread == 0) {
+        current_spread = rnorm_round(1, unlist(mu), unlist(sdev))
+      }
+      if (current_spread > 0) {
+        list[[homename]]$'wins' = list[[homename]]$'wins'+1
+        list[[awayname]]$'losses' = list[[awayname]]$'losses'+1
+        list[[homename]]$'p_spread' = list[[homename]]$'p_spread'+current_spread
+      } else if (current_spread < 0) {
+        list[[awayname]]$'wins' = list[[awayname]]$'wins'+1
+        list[[homename]]$'losses' = list[[homename]]$'losses'+1
+        list[[awayname]]$'p_spread' = list[[awayname]]$'p_spread'+current_spread
+      }
+    }
+    
+  }
+  return(list)
+  
+}
+
+
+
+
+
+```
+
+# Restaurant
+
+## Q1
+
+Since weekday and weekend profit are both normally distributed and we know that the sum of two normally distributed variables (if they are independent) is also a normally distributed random variable, then we can sum up weekends and weekdays to obtain a weekly distribution of sales. Now the question is a bit confusing as to what constitutes a random variable here.
+
+Assuming that each day of the week that is a weekday has the weekday mean and weekday deviation and each day of the week that is a weekend day has the weekend mean and weekend deviation which would lead to 5 random variables for each weekday and 2 for each weekend day. Assuming further that each day is independent of the others we get a mean of 5*2000 + 2*3000 = 16000 and a variance of (5^2)*(500^2) + (2^2)*(700^2) = 8,210,000
+
+The sum of weekly expenses is 14000
+
+Thus we are looking for the probability that the restaurant makes at least 14000 in revenue in any given week which is given by area under the distribution curve with a lower bound at 14000. Using pnorm produces the following result:
+
+```{r echo = TRUE}
+
+(1-pnorm(14000,mean = 16000, sd = sqrt(8210000)))*100
+
+
+```
+
+We can see that there is a 76% chance that the restaurant makes a profit on any given week.
+
+## Q2 
+
+There are 4 weeks plus 3 days in December 2019 assuming the week starts on Sunday. That's 4 weeks and 3/7th of a week. The total expenses come out to 4*14000+(3/7)*14000 = 62000. With 22 weekdays and 9 weekend days the distribution will have a mean of 22*2000 + 9*3000 = 71000 and the variance of (22^2)*(500^2)+(9^2)*(700^2) = 160,690,000. In order to lose money this December the restarant needs to make less than 62000. Again using pnorm(62000) yields the percent result:
+
+
+```{r echo = TRUE}
+
+pnorm(62000,mean=71000,sd = sqrt(160690000))*100
+
+
+```
+
+Here we see that there is about a 24% chance that the restaurant doesn't make money in December.
+
+## Q3
+
+Assuming for simplicity 52 weeks in a year and knowing already that the weekly distribution has a mean of 16000 we can find the annual mean to be 52*16000 = 832000 and the annual expenses to be 52*14000 = 728000, as such, annual expected profit is 832000-728000 = 104000.
+
+## Q4
+
+If the marketing campaign succeeds the annual profit will be 832000*1.15 - 728000 - 10000 = 218800
+
+If the marketing campaign fails the annual profit will be 832000 - 728000 - 10000 = 94000
+
+With an 80% chance of success of the marketing campaign the expected annual profit is 218800*0.8 + 96000*0.2 = 194080 -- Yes. Run the campaign as it increases expected annual profit by 90000!
+
